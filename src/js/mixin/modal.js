@@ -1,25 +1,8 @@
-import { $, doc, isWithin, toJQuery, transitionend } from '../util/index';
+import { $, doc, docElement, isWithin, promise, requestAnimationFrame, toMs, transitionend } from '../util/index';
 import Class from './class';
 import Toggable from './toggable';
 
 var active;
-
-doc.on({
-
-    click(e) {
-        if (active && active.bgClose && !e.isDefaultPrevented() && !isWithin(e.target, active.panel)) {
-            active.hide();
-        }
-    },
-
-    keydown(e) {
-        if (e.keyCode === 27 && active && active.escClose) {
-            e.preventDefault();
-            active.hide();
-        }
-    }
-
-});
 
 export default {
 
@@ -41,111 +24,138 @@ export default {
         stack: false
     },
 
-    ready() {
+    computed: {
 
-        this.page = $(document.documentElement);
-        this.body = $(document.body);
-        this.panel = toJQuery(`.${this.clsPanel}`, this.$el);
+        body() {
+            return $(document.body);
+        },
 
-        this.$el.on('click', this.selClose, e => {
-            e.preventDefault();
-            this.hide();
-        });
+        panel() {
+            return this.$el.find(`.${this.clsPanel}`);
+        },
+
+        transitionDuration() {
+            return toMs(this.panel.css('transition-duration'));
+        },
+
+        scrollbarWidth() {
+            var width = docElement[0].style.width;
+
+            docElement.css('width', '');
+
+            var scrollbarWidth = window.innerWidth - docElement.outerWidth(true);
+
+            if (width) {
+                docElement.width(width);
+            }
+
+            return scrollbarWidth;
+        },
 
     },
 
-    events: {
+    events: [
 
-        toggle(e) {
-            e.preventDefault();
-            this.toggleNow(this.$el);
+        {
+
+            name: 'click',
+
+            delegate() {
+                return this.selClose;
+            },
+
+            handler(e) {
+                e.preventDefault();
+                this.hide();
+            }
+
         },
 
-        beforeshow(e) {
+        {
 
-            if (!this.$el.is(e.target)) {
-                return;
+            name: 'toggle',
+
+            handler(e) {
+                e.preventDefault();
+                this.toggleNow(this.$el);
             }
 
-            if (this.isActive()) {
-                return false;
-            }
+        },
 
-            var prev = active && active !== this && active;
+        {
 
-            if (!active) {
-                this.body.css('overflow-y', this.getScrollbarWidth() && this.overlay ? 'scroll' : '');
-            }
+            name: 'beforeshow',
 
-            active = this;
+            self: true,
 
-            if (prev) {
-                if (this.stack) {
-                    this.prev = prev;
-                } else {
-                    prev.hide();
+            handler() {
+
+                if (this.isActive()) {
+                    return false;
                 }
-            }
 
-            this.panel.one(transitionend, () => {
-                var event = $.Event('show');
-                event.isShown = true;
-                this.$el.trigger(event, [this]);
-            });
+                var prev = active && active !== this && active;
+
+                if (!active) {
+                    this.body.css('overflow-y', this.scrollbarWidth && this.overlay ? 'scroll' : '');
+                }
+
+                active = this;
+
+                if (prev) {
+                    if (this.stack) {
+                        this.prev = prev;
+                    } else {
+                        prev.hide();
+                    }
+                } else {
+                    requestAnimationFrame(() => register(this.$options.name));
+                }
+
+                docElement.addClass(this.clsPage);
+
+            }
 
         },
 
-        show(e) {
+        {
 
-            if (!this.$el.is(e.target)) {
-                return;
-            }
+            name: 'beforehide',
 
-            if (!e.isShown) {
-                e.stopImmediatePropagation();
+            self: true,
+
+            handler() {
+
+                if (!this.isActive()) {
+                    return false;
+                }
+
+                active = active && active !== this && active || this.prev;
+
+                if (!active) {
+                    deregister(this.$options.name);
+                }
+
             }
 
         },
 
-        beforehide(e) {
+        {
 
-            if (!this.$el.is(e.target)) {
-                return;
-            }
+            name: 'hidden',
 
-            active = active && active !== this && active || this.prev;
+            self: true,
 
-            var hide = () => {
-                var event = $.Event('hide');
-                event.isHidden = true;
-                this.$el.trigger(event, [this]);
-            };
-
-            if (parseFloat(this.panel.css('transition-duration'))) {
-                this.panel.one(transitionend, hide);
-            } else {
-                hide();
-            }
-        },
-
-        hide(e) {
-
-            if (!this.$el.is(e.target)) {
-                return;
-            }
-
-            if (!e.isHidden) {
-                e.stopImmediatePropagation();
-                return;
-            }
-
-            if (!active) {
-                this.body.css('overflow-y', '');
+            handler() {
+                if (!active) {
+                    docElement.removeClass(this.clsPage);
+                    this.body.css('overflow-y', '');
+                }
             }
 
         }
 
-    },
+    ],
 
     methods: {
 
@@ -158,36 +168,51 @@ export default {
         },
 
         show() {
-            var deferred = $.Deferred();
-            this.$el.one('show', () => deferred.resolve());
-            this.toggleNow(this.$el, true);
-            return deferred.promise();
+            return this.toggleNow(this.$el, true);
         },
 
         hide() {
-            var deferred = $.Deferred();
-            this.$el.one('hide', () => deferred.resolve());
-            this.toggleNow(this.$el, false);
-            return deferred.promise();
+            return this.toggleNow(this.$el, false);
         },
 
         getActive() {
             return active;
         },
 
-        getScrollbarWidth() {
-            var width = this.page[0].style.width;
+        _toggleImmediate(el, show) {
+            this._toggle(el, show);
 
-            this.page.css('width', '');
-
-            var scrollbarWidth = window.innerWidth - this.page.outerWidth(true);
-
-            if (width) {
-                this.page.width(width);
-            }
-
-            return scrollbarWidth;
-        }
+            return this.transitionDuration ? promise(resolve => {
+                this.panel.one(transitionend, resolve);
+                setTimeout(() => {
+                    resolve();
+                    this.panel.off(transitionend, resolve);
+                }, this.transitionDuration);
+            }) : promise.resolve();
+        },
     }
 
+}
+
+function register(name) {
+    doc.on({
+
+        [`click.${name}`](e) {
+            if (active && active.bgClose && !e.isDefaultPrevented() && !isWithin(e.target, active.panel)) {
+                active.hide();
+            }
+        },
+
+        [`keydown.${name}`](e) {
+            if (e.keyCode === 27 && active && active.escClose) {
+                e.preventDefault();
+                active.hide();
+            }
+        }
+
+    });
+}
+
+function deregister(name) {
+    doc.off(`click.${name}`).off(`keydown.${name}`);
 }

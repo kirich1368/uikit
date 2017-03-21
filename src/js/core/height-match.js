@@ -1,4 +1,4 @@
-import { $, toJQuery } from '../util/index';
+import { $ } from '../util/index';
 
 export default function (UIkit) {
 
@@ -16,38 +16,50 @@ export default function (UIkit) {
             row: true
         },
 
+        connected() {
+            this.$emit();
+        },
+
+        computed: {
+
+            elements() {
+                return $(this.target, this.$el);
+            }
+
+        },
+
         update: {
+
+            read() {
+
+                var lastOffset = false;
+
+                this.elements.css('minHeight', '');
+
+                this.rows = !this.row
+                    ? [this.match(this.elements)]
+                    : this.elements.toArray().reduce((rows, el) => {
+
+                        if (lastOffset !== el.offsetTop) {
+                            rows.push([el]);
+                        } else {
+                            rows[rows.length - 1].push(el);
+                        }
+
+                        lastOffset = el.offsetTop;
+
+                        return rows;
+
+                    }, []).map(elements => this.match($(elements)));
+            },
 
             write() {
 
-                let elements = toJQuery(this.target, this.$el).css('min-height', '');
-
-                if (!this.row) {
-                    this.match(elements);
-                    return this;
-                }
-
-                var lastOffset = false, group = [];
-
-                elements.each((i, el) => {
-
-                    el = $(el);
-
-                    var offset = el.offset().top;
-
-                    if (offset != lastOffset && group.length) {
-                        this.match($(group));
-                        group = [];
-                        offset = el.offset().top;
-                    }
-
-                    group.push(el);
-                    lastOffset = offset;
-                });
-
-                if (group.length) {
-                    this.match($(group));
-                }
+                this.rows.forEach(({height, elements}) =>
+                    elements && elements.each((_, el) =>
+                        el.style.minHeight = `${height}px`
+                    )
+                );
 
             },
 
@@ -60,36 +72,39 @@ export default function (UIkit) {
             match(elements) {
 
                 if (elements.length < 2) {
-                    return;
+                    return {};
                 }
 
-                var max = 0;
+                var max = 0, heights = [];
 
-                elements
-                    .each((i, el) => {
+                elements = elements
+                    .each((_, el) => {
 
-                        el = $(el);
+                        var $el, style, hidden;
 
-                        var height;
+                        if (el.offsetHeight === 0) {
+                            $el = $(el);
+                            style = $el.attr('style') || null;
+                            hidden = $el.attr('hidden') || null;
 
-                        if (el.css('display') === 'none') {
-                            var style = el.attr('style');
-                            el.attr('style', `${style};display:block !important;`);
-                            height = el.outerHeight();
-                            el.attr('style', style || '');
-                        } else {
-                            height = el.outerHeight();
+                            $el.attr({
+                                style: `${style};display:block !important;`,
+                                hidden: null
+                            });
                         }
 
-                        max = Math.max(max, height);
+                        max = Math.max(max, el.offsetHeight);
+                        heights.push(el.offsetHeight);
+
+                        if ($el) {
+                            $el.attr({style, hidden});
+                        }
 
                     })
-                    .each((i, el) => {
-                        el = $(el);
-                        el.css('min-height', `${max - (el.outerHeight() - parseFloat(el.css('height')))}px`);
-                    });
-            }
+                    .filter(i => heights[i] < max);
 
+                return {height: max, elements};
+            }
         }
 
     });

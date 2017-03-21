@@ -1,4 +1,4 @@
-import { $, isInView, toJQuery } from '../util/index';
+import { $, isInView } from '../util/index';
 
 export default function (UIkit) {
 
@@ -7,7 +7,7 @@ export default function (UIkit) {
         args: 'cls',
 
         props: {
-            cls: String,
+            cls: 'list',
             target: String,
             hidden: Boolean,
             offsetTop: Number,
@@ -17,7 +17,7 @@ export default function (UIkit) {
         },
 
         defaults: {
-            cls: 'uk-scrollspy-inview',
+            cls: ['uk-scrollspy-inview'],
             target: false,
             hidden: true,
             offsetTop: 0,
@@ -28,16 +28,20 @@ export default function (UIkit) {
         },
 
         init() {
-            this.$emit();
+            this.$emitSync();
+        },
+
+        computed: {
+
+            elements() {
+                return this.target && $(this.target, this.$el) || this.$el;
+            }
+
         },
 
         update: [
 
             {
-
-                read() {
-                    this.elements = this.target && toJQuery(this.target, this.$el) || this.$el;
-                },
 
                 write() {
                     if (this.hidden) {
@@ -50,10 +54,11 @@ export default function (UIkit) {
             {
 
                 read() {
-                    this.elements.each((i, el) => {
+                    this.elements.each((_, el) => {
 
                         if (!el._scrollspy) {
-                            el._scrollspy = {toggles: ($(el).attr('uk-scrollspy-class') || this.cls).split(',')};
+                            var cls = $(el).attr('uk-scrollspy-class');
+                            el._scrollspy = {toggles: cls && cls.split(',') || this.cls};
                         }
 
                         el._scrollspy.show = isInView(el, this.offsetTop, this.offsetLeft);
@@ -65,7 +70,7 @@ export default function (UIkit) {
 
                     var index = this.elements.length === 1 ? 1 : 0;
 
-                    this.elements.each((i, el) => {
+                    this.elements.each((_, el) => {
 
                         var $el = $(el);
 

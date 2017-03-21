@@ -1,4 +1,4 @@
-import { $, classify, createEvent, isString, mergeOptions } from '../util/index';
+import { classify, createEvent, isString, mergeOptions, toNode } from '../util/index';
 
 export default function (UIkit) {
 
@@ -18,7 +18,10 @@ export default function (UIkit) {
 
     UIkit.mixin = function (mixin, component) {
         component = (isString(component) ? UIkit.components[component] : component) || this;
-        component.options = mergeOptions(component.options, mixin);
+        mixin = mergeOptions({}, mixin);
+        mixin.mixins = component.options.mixins;
+        delete component.options.mixins;
+        component.options = mergeOptions(mixin, component.options);
     };
 
     UIkit.extend = function (options) {
@@ -49,7 +52,7 @@ export default function (UIkit) {
 
         }
 
-        element = $(element)[0];
+        element = toNode(element);
 
         if (parents) {
 

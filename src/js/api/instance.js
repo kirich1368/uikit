@@ -1,4 +1,4 @@
-import { $, createEvent, ready } from '../util/index';
+import { $, createEvent } from '../util/index';
 
 export default function (UIkit) {
 
@@ -10,7 +10,6 @@ export default function (UIkit) {
 
         if (!el[DATA]) {
             el[DATA] = {};
-            UIkit.elements.push(el);
         }
 
         if (el[DATA][name]) {
@@ -26,14 +25,9 @@ export default function (UIkit) {
 
         this._callHook('init');
 
-        this._initEvents();
-
-        if (document.documentElement.contains(this.$el[0])) {
-            this._callHook('connected');
+        if (document.documentElement.contains(el)) {
+            this._callConnected();
         }
-
-        ready(() => this._callReady());
-
     };
 
     UIkit.prototype.$emit = function (e) {
@@ -52,13 +46,22 @@ export default function (UIkit) {
         UIkit.update(createEvent(e || 'update', true, false, {sync: true}), this.$el, parents);
     };
 
+    UIkit.prototype.$reset = function (data) {
+        this._callDisconnected();
+        this._initProps(data);
+        this._callConnected();
+        this._callUpdate();
+    };
+
     UIkit.prototype.$destroy = function (remove = false) {
 
-        this._callHook('destroy');
-
-        delete UIkit.instances[this._uid];
-
         var el = this.$options.el;
+
+        if (el) {
+            this._callDisconnected();
+        }
+
+        this._callHook('destroy');
 
         if (!el || !el[DATA]) {
             return;
@@ -68,12 +71,6 @@ export default function (UIkit) {
 
         if (!Object.keys(el[DATA]).length) {
             delete el[DATA];
-
-            var index = UIkit.elements.indexOf(el);
-
-            if (~index) {
-                UIkit.elements.splice(index, 1);
-            }
         }
 
         if (remove) {

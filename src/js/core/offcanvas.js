@@ -1,5 +1,5 @@
 import { Modal } from '../mixin/index';
-import { transitionend } from '../util/index';
+import { docElement, transitionend } from '../util/index';
 
 export default function (UIkit) {
 
@@ -30,19 +30,30 @@ export default function (UIkit) {
             selClose: '.uk-offcanvas-close'
         },
 
-        init() {
+        computed: {
 
-            this.clsFlip = this.flip ? this.clsFlip : '';
-            this.clsOverlay = this.overlay ? this.clsOverlay : '';
-            this.clsPageOverlay = this.overlay ? this.clsPageOverlay : '';
-            this.clsMode = `${this.clsMode}-${this.mode}`;
+            clsFlip() {
+                return this.flip ? this.$props.clsFlip : '';
+            },
 
-            if (this.mode === 'none' || this.mode === 'reveal') {
-                this.clsSidebarAnimation = '';
-            }
+            clsOverlay() {
+                return this.overlay ? this.$props.clsOverlay : '';
+            },
 
-            if (this.mode !== 'push' && this.mode !== 'reveal') {
-                this.clsPageAnimation = '';
+            clsPageOverlay() {
+                return this.overlay ? this.$props.clsPageOverlay : '';
+            },
+
+            clsMode() {
+                return `${this.$props.clsMode}-${this.mode}`;
+            },
+
+            clsSidebarAnimation() {
+                return this.mode === 'none' || this.mode === 'reveal' ? '' : this.$props.clsSidebarAnimation;
+            },
+
+            clsPageAnimation() {
+                return this.mode !== 'push' && this.mode !== 'reveal' ? '' : this.$props.clsPageAnimation
             }
 
         },
@@ -52,7 +63,7 @@ export default function (UIkit) {
             write() {
 
                 if (this.isActive()) {
-                    this.page.width(window.innerWidth - this.getScrollbarWidth());
+                    docElement.width(window.innerWidth - this.scrollbarWidth);
                 }
 
             },
@@ -61,46 +72,47 @@ export default function (UIkit) {
 
         },
 
-        events: {
+        events: [
 
-            beforeshow(e) {
+            {
+                name: 'beforeshow',
 
-                if (!this.$el.is(e.target)) {
-                    return;
+                self: true,
+
+                handler() {
+                    docElement.addClass(`${this.clsFlip} ${this.clsPageAnimation} ${this.clsPageOverlay}`);
+                    this.panel.addClass(`${this.clsSidebarAnimation} ${this.clsMode}`);
+                    this.$el.addClass(this.clsOverlay).css('display', 'block').height();
                 }
-
-                this.page.addClass(`${this.clsPage} ${this.clsFlip} ${this.clsPageAnimation} ${this.clsPageOverlay}`);
-                this.panel.addClass(`${this.clsSidebarAnimation} ${this.clsMode}`);
-                this.$el.addClass(this.clsOverlay).css('display', 'block').height();
-
             },
 
-            beforehide(e) {
+            {
+                name: 'beforehide',
 
-                if (!this.$el.is(e.target)) {
-                    return;
+                self: true,
+
+                handler() {
+                    docElement.removeClass(this.clsPageAnimation);
+
+                    if (this.mode === 'none' || this.getActive() && this.getActive() !== this) {
+                        this.panel.trigger(transitionend);
+                    }
                 }
-
-                this.page.removeClass(this.clsPageAnimation).css('margin-left', '');
-
-                if (this.mode === 'none' || this.getActive() && this.getActive() !== this) {
-                    this.panel.trigger(transitionend);
-                }
-
             },
 
-            hide(e) {
+            {
+                name: 'hidden',
 
-                if (!this.$el.is(e.target)) {
-                    return;
+                self: true,
+
+                handler() {
+                    docElement.removeClass(`${this.clsFlip} ${this.clsPageOverlay}`).width('');
+                    this.panel.removeClass(`${this.clsSidebarAnimation} ${this.clsMode}`);
+                    this.$el.removeClass(this.clsOverlay).css('display', '');
                 }
-
-                this.page.removeClass(`${this.clsPage} ${this.clsFlip} ${this.clsPageOverlay}`).width('');
-                this.panel.removeClass(`${this.clsSidebarAnimation} ${this.clsMode}`);
-                this.$el.removeClass(this.clsOverlay).css('display', '');
             }
 
-        }
+        ]
 
     });
 

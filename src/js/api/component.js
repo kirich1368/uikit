@@ -1,4 +1,4 @@
-import { $, camelize, isPlainObject } from '../util/index';
+import { $, camelize, isArray, isJQuery, isPlainObject, isString } from '../util/index';
 
 export default function (UIkit) {
 
@@ -29,13 +29,9 @@ export default function (UIkit) {
                 return new UIkit.components[name]({data: [...arguments]});
             }
 
-            var result = [];
-
-            data = data || {};
-
-            $(element).each((i, el) => result.push(el[DATA] && el[DATA][name] || new UIkit.components[name]({el, data})));
-
-            return result;
+            return $(element).toArray().map(element =>
+                UIkit.getComponent(element, name) || new UIkit.components[name]({el: element, data: data || {}})
+            )[0];
         };
 
         if (document.body && !options.options.functional) {
@@ -45,7 +41,7 @@ export default function (UIkit) {
         return UIkit.components[name];
     };
 
-    UIkit.getComponents = element => element && element[DATA] || {};
+    UIkit.getComponents = element => element && (element = isJQuery(element) ? element[0] : element) && element[DATA] || {};
     UIkit.getComponent = (element, name) => UIkit.getComponents(element)[name];
 
     UIkit.connect = node => {
@@ -53,20 +49,8 @@ export default function (UIkit) {
         var name;
 
         if (node[DATA]) {
-
-            if (!~UIkit.elements.indexOf(node)) {
-                UIkit.elements.push(node);
-            }
-
             for (name in node[DATA]) {
-
-                var component = node[DATA][name];
-
-                if (!(component._uid in UIkit.instances)) {
-                    UIkit.instances[component._uid] = component;
-                }
-
-                component._callHook('connected');
+                node[DATA][name]._callConnected();
             }
         }
 
@@ -87,21 +71,9 @@ export default function (UIkit) {
     };
 
     UIkit.disconnect = node => {
-
-        var index = UIkit.elements.indexOf(node);
-
-        if (~index) {
-            UIkit.elements.splice(index, 1);
-        }
-
         for (var name in node[DATA]) {
-            var component = node[DATA][name];
-            if (component._uid in UIkit.instances) {
-                delete UIkit.instances[component._uid];
-                component._callHook('disconnected');
-            }
+            node[DATA][name]._callDisconnected();
         }
-
     }
 
 }
