@@ -1,46 +1,69 @@
 var fs = require('fs');
-var exec = require('child_process').exec;
-var path = require('path');
-var write = require('./util').write;
 var glob = require('glob');
+var path = require('path');
+var util = require('./util');
+var rtlcss = require('rtlcss');
+var postcss = require('postcss');
+var args = require('minimist')(process.argv)._;
 
-glob(`dist/css/!(*.min).css`, (err, files) =>
-    files.forEach(file =>
-        fs.readFile(file, 'utf8', (err, data) =>
-            fs.writeFile(file, data.replace(/\.\.\/dist\//g, ''), err =>
-                err && console.log(err)
-            )
-        )
-    )
-);
+var rtl = ~args.indexOf('rtl');
 
-// build custom/*
-if (!fs.existsSync('themes.json') && !fs.existsSync('custom')) {
-    return write('themes.json', '{}');
-}
+[
 
-if (!fs.existsSync('custom')) {
-    return;
-}
+    {src: 'src/less/uikit.less', dist: `dist/css/uikit-core${rtl ? '-rtl' : ''}.css`},
+    {src: 'src/less/uikit.theme.less', dist: `dist/css/uikit${rtl ? '-rtl' : ''}.css`}
 
-var themes = {};
+].forEach(config => compile(config.src, config.dist));
 
-fs.readdirSync('custom').filter(file => path.join('custom', file).match(/\.less$/)).forEach(theme => {
+var themes = fs.existsSync('themes.json') ? JSON.parse(fs.readFileSync('themes.json')) : {};
 
-    theme = path.basename(theme, '.less');
+glob.sync('custom/*.less').forEach(file => {
 
-    themes[theme] = {file: `../dist/css/uikit.${theme}.css`};
+    var theme = path.basename(file, '.less'),
+        dist = `dist/css/uikit.${theme}${rtl ? '-rtl' : ''}.css`;
 
-    exec(`lessc --relative-urls --rootpath=../custom/ custom/${theme}.less > dist/css/uikit.${theme}.css`, (error, stdout, stderr) => {
+    themes[theme] = {css: `../${dist}`};
 
-        if (stderr) {
-            console.log(`Error building: dist/css/uikit.${theme}.css `, stderr);
-        } else {
-            console.log(`dist/css/uikit.${theme}.css build `);
-        }
-    });
+    if (fs.existsSync(`dist/js/uikit-icons-${theme}.js`)) {
+        themes[theme].icons = `dist/js/uikit-icons-${theme}.js`;
+    }
+
+    return compile(file, dist);
+
 });
 
-if (Object.keys(themes).length) {
-    write('themes.json', JSON.stringify(themes));
+if (!rtl && (Object.keys(themes).length || !fs.existsSync('themes.json'))) {
+    util.write('themes.json', JSON.stringify(themes));
+}
+
+function compile(file, dist) {
+    return util.read(file).then(data =>
+        util.renderLess(data, {
+            relativeUrls: true,
+            rootpath: '../../',
+            paths: ['src/less/', 'custom/']
+        })
+            .then(output => output.replace(/\.\.\/dist\//g, ''))
+            .then(output => !rtl && output || postcss([
+                css => {
+                    css.insertBefore(css.nodes[0], postcss.comment({text: 'rtl:begin:rename'}));
+                    css.insertAfter(css.nodes[css.nodes.length - 1], postcss.comment({text: 'rtl:end:rename'}));
+                },
+                rtlcss({
+                    stringMap: [{
+                        name: 'previous-next',
+                        priority: 100,
+                        search: ['previous', 'Previous', 'PREVIOUS'],
+                        replace: ['next', 'Next', 'NEXT'],
+                        options: {
+                            scope: '*',
+                            ignoreCase: false
+                        }
+                    }]
+                })
+            ]).process(output).css)
+            .then(output => util.write(dist, output))
+            .then(util.minify),
+        error => console.log(error)
+    );
 }

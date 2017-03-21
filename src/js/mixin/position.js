@@ -1,4 +1,4 @@
-import { flipPosition, position, removeClass, toNumber } from '../util/index';
+import { isRtl, flipPosition, position, removeClass, toNumber } from '../util/index';
 
 export default {
 
@@ -10,26 +10,33 @@ export default {
     },
 
     defaults: {
-        pos: 'bottom-left',
+        pos: !isRtl ? 'bottom-left' : 'bottom-right',
         flip: true,
         offset: false,
         clsPos: ''
     },
 
-    init() {
-        this.pos = (this.pos + (!~this.pos.indexOf('-') ? '-center' : '')).split('-');
-        this.dir = this.pos[0];
-        this.align = this.pos[1];
+    computed: {
+
+        pos() {
+            return (this.$props.pos + (!~this.$props.pos.indexOf('-') ? '-center' : '')).split('-');
+        },
+
+        dir() {
+            return this.pos[0];
+        },
+
+        align() {
+            return this.pos[1];
+        }
+
     },
 
     methods: {
 
         positionAt(element, target, boundary) {
 
-            removeClass(element, this.clsPos + '-(top|bottom|left|right)(-[a-z]+)?').css({top: '', left: ''});
-
-            this.dir = this.pos[0];
-            this.align = this.pos[1];
+            removeClass(element, `${this.clsPos}-(top|bottom|left|right)(-[a-z]+)?`).css({top: '', left: ''});
 
             var offset = toNumber(this.offset) || 0,
                 axis = this.getAxis(),
@@ -52,7 +59,7 @@ export default {
         },
 
         getAxis() {
-            return this.pos[0] === 'top' || this.pos[0] === 'bottom' ? 'y' : 'x';
+            return this.dir === 'top' || this.dir === 'bottom' ? 'y' : 'x';
         }
 
     }

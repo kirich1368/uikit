@@ -12,18 +12,10 @@
 @close-color:                                   @global-muted-color;
 @close-hover-color:                             @global-color;
 
-@internal-close-image:                          "../../../dist/images/close.svg";
-
 
 /* ========================================================================
    Component: Close
  ========================================================================== */
-
-/*
- * Icon
- */
-
-.uk-close::before { background-image: data-uri('image/svg+xml;charset=UTF-8', @internal-close-image); }
 
 /*
  * Adopts `uk-icon`
@@ -75,12 +67,6 @@
     outline: none;
     .hook-close-hover;
 }
-
-
-/* Size modifier
- ========================================================================== */
-
-.uk-close-large::before { background-image: data-uri('image/svg+xml;charset=UTF-8', "../../../dist/images/close-large.svg"); }
 
 
 // Hooks

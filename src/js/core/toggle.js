@@ -1,4 +1,4 @@
-import { $, hasTouch } from '../util/index';
+import { $, hasTouch, isTouch, pointerEnter, pointerLeave, query } from '../util/index';
 
 export default function (UIkit) {
 
@@ -9,9 +9,9 @@ export default function (UIkit) {
         args: 'target',
 
         props: {
-            href: 'jQuery',
-            target: 'jQuery',
-            mode: String,
+            href: String,
+            target: null,
+            mode: 'list',
             media: 'media'
         },
 
@@ -23,40 +23,62 @@ export default function (UIkit) {
             media: false
         },
 
-        ready() {
+        computed: {
 
-            this.target = this.target || this.href || this.$el;
-
-            this.mode = hasTouch && this.mode == 'hover' ? 'click' : this.mode;
-
-            if (this.mode === 'media') {
-                return;
+            target() {
+                return query(this.$props.target || this.href, this.$el) || this.$el;
             }
-
-            if (this.mode === 'hover') {
-                this.$el.on({
-                    mouseenter: () => this.toggle('toggleShow'),
-                    mouseleave: () => this.toggle('toggleHide')
-                });
-            }
-
-            this.$el.on('click', e => {
-
-                // TODO better isToggled handling
-                if ($(e.target).closest('a[href="#"], button').length || $(e.target).closest('a[href]') && (this.cls || !this.target.is(':visible'))) {
-                    e.preventDefault();
-                }
-
-                this.toggle();
-            });
 
         },
+
+        events: [
+
+            {
+
+                name: `${pointerEnter} ${pointerLeave}`,
+
+                filter() {
+                    return ~this.mode.indexOf('hover');
+                },
+
+                handler(e) {
+                    if (!isTouch(e)) {
+                        this.toggle(e.type === pointerEnter ? 'toggleshow' : 'togglehide');
+                    }
+                }
+
+            },
+
+            {
+
+                name: 'click',
+
+                filter() {
+                    return ~this.mode.indexOf('click') || hasTouch;
+                },
+
+                handler(e) {
+
+                    if (!isTouch(e) && !~this.mode.indexOf('click')) {
+                        return;
+                    }
+
+                    // TODO better isToggled handling
+                    if ($(e.target).closest('a[href="#"], button').length || $(e.target).closest('a[href]') && (this.cls || !this.target.is(':visible'))) {
+                        e.preventDefault();
+                    }
+
+                    this.toggle();
+                }
+
+            }
+        ],
 
         update: {
 
             write() {
 
-                if (this.mode !== 'media' || !this.media) {
+                if (!~this.mode.indexOf('media') || !this.media) {
                     return;
                 }
 

@@ -1,4 +1,4 @@
-import { getStyle, fastdom, on, requestAnimationFrame, win } from '../util/index';
+import { animationstart, getStyle, on, requestAnimationFrame, toMs, win } from '../util/index';
 
 import Accordion from './accordion';
 import Alert from './alert';
@@ -21,7 +21,6 @@ import Responsive from './responsive';
 import Scroll from './scroll';
 import Scrollspy from './scrollspy';
 import ScrollspyNav from './scrollspy-nav';
-import Spinner from './spinner';
 import Sticky from './sticky';
 import Svg from './svg';
 import Switcher from './switcher';
@@ -30,7 +29,7 @@ import Toggle from './toggle';
 
 export default function (UIkit) {
 
-    var scroll = null, dir, ticking, resizing;
+    var scroll = null, dir, ticking, resizing, started = 0;
 
     win
         .on('load', UIkit.update)
@@ -49,6 +48,10 @@ export default function (UIkit) {
                 scroll = 0;
             }
 
+            if (scroll === window.pageYOffset) {
+                return;
+            }
+
             dir = scroll < window.pageYOffset;
             scroll = window.pageYOffset;
             if (!ticking) {
@@ -61,38 +64,20 @@ export default function (UIkit) {
             }
         });
 
-    var started = 0;
-    on(document, 'animationstart', ({target}) => {
-        fastdom.measure(() => {
-            if (hasAnimation(target)) {
-                fastdom.mutate(() => {
-                    document.body.style.overflowX = 'hidden';
-                    started++;
-                });
-            }
-        });
-    }, true);
-
-    on(document, 'animationend', ({target}) => {
-        fastdom.measure(() => {
-            if (hasAnimation(target) && !--started) {
-                fastdom.mutate(() => document.body.style.overflowX = '')
-            }
-        });
-    }, true);
-
-    on(document.documentElement, 'webkitAnimationEnd', ({target}) => {
-        fastdom.measure(() => {
-            if (getStyle(target, 'webkitFontSmoothing') === 'antialiased') {
-                fastdom.mutate(() => {
-                    target.style.webkitFontSmoothing = 'subpixel-antialiased';
-                    setTimeout(() => target.style.webkitFontSmoothing = '');
-                })
-            }
-        });
+    on(document, animationstart, ({target}) => {
+        if ((getStyle(target, 'animationName') || '').match(/^uk-.*(left|right)/)) {
+            started++;
+            document.body.style.overflowX = 'hidden';
+            setTimeout(() => {
+                if (!--started) {
+                    document.body.style.overflowX = '';
+                }
+            }, toMs(getStyle(target, 'animationDuration')) + 100);
+        }
     }, true);
 
     // core components
+    UIkit.use(Toggle);
     UIkit.use(Accordion);
     UIkit.use(Alert);
     UIkit.use(Cover);
@@ -116,12 +101,7 @@ export default function (UIkit) {
     UIkit.use(Sticky);
     UIkit.use(Svg);
     UIkit.use(Icon);
-    UIkit.use(Spinner);
     UIkit.use(Switcher);
     UIkit.use(Tab);
-    UIkit.use(Toggle);
 
-    function hasAnimation(target) {
-        return (getStyle(target, 'animationName') || '').lastIndexOf('uk-', 0) === 0;
-    }
 }

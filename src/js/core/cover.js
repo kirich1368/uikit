@@ -1,8 +1,11 @@
+import { Class } from '../mixin/index';
 import { Dimensions } from '../util/index';
 
 export default function (UIkit) {
 
     UIkit.component('cover', {
+
+        mixins: [Class],
 
         props: {
             automute: Boolean,
@@ -11,6 +14,18 @@ export default function (UIkit) {
         },
 
         defaults: {automute: true},
+
+        computed: {
+
+            el() {
+                return this.$el[0];
+            },
+
+            parent() {
+                return this.$el.parent()[0];
+            }
+
+        },
 
         ready() {
 
@@ -34,15 +49,15 @@ export default function (UIkit) {
 
             write() {
 
-                if (this.$el[0].offsetHeight === 0) {
+                if (this.el.offsetHeight === 0) {
                     return;
                 }
 
                 this.$el
                     .css({width: '', height: ''})
                     .css(Dimensions.cover(
-                        {width: this.width || this.$el.width(), height: this.height || this.$el.height()},
-                        {width: this.$el.parent().width(), height: this.$el.parent().height()}
+                        {width: this.width || this.el.clientWidth, height: this.height || this.el.clientHeight},
+                        {width: this.parent.offsetWidth, height: this.parent.offsetHeight}
                     ));
 
             },
